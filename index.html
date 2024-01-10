@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workout Stopwatch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"
+    />
+    <style>
+      :root {
+        --background-color-light: #fff;
+        --background-color-dark: #333;
+        --text-color-light: #333;
+        --text-color-dark: #fff;
+        /* Define other variables as needed */
+      }
+
+      body.light-mode {
+        background-color: var(--background-color-light);
+        color: var(--text-color-light);
+        /* Apply other light mode styles */
+      }
+
+      body.dark-mode {
+        background-color: var(--background-color-dark);
+        color: var(--text-color-dark);
+        /* Apply other dark mode styles */
+      }
+
+      body {
+        font-family: "Roboto", sans-serif;
+      }
+      #timerDisplay {
+        font-size: 3rem;
+      }
+      #exerciseInput input,
+      #exerciseInput select,
+      #exerciseInput button {
+        margin-right: 0.5rem;
+      }
+      #exerciseTable th,
+      #exerciseTable td {
+        border: 1px solid #ddd;
+      }
+      .clock-container {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        margin: 20px auto;
+      }
+      .clock-face {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-color: #fff;
+        border-radius: 50%;
+        border: 2px solid #333;
+      }
+      .hand {
+        position: absolute;
+        bottom: 50%;
+        left: 50%;
+        width: 2px;
+        height: 35%;
+        background-color: #333;
+        transform-origin: 50% 100%;
+        transform: translateX(-50%);
+      }
+      .tick {
+        position: absolute;
+        width: 2px;
+        height: 10px;
+        background-color: #333;
+        left: 50%;
+        transform-origin: 50% 100%;
+      }
+    </style>
+  </head>
+  <body class="bg-white">
+    <!-- Header Navigation -->
+    <div class="bg-gray-800 text-white p-4 shadow">
+      <div class="container mx-auto flex justify-between items-center">
+        <!-- Logo (SVG example) -->
+        <div id="logo" class="flex items-center">
+          <svg
+            width="50"
+            height="50"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <!-- Your SVG content here -->
+          </svg>
+          <span class="ml-2 text-xl">Workout Tracker</span>
+        </div>
+        <!-- Username and Reset Data Button -->
+        <div>
+          <input
+            type="text"
+            id="username"
+            placeholder="Enter your name"
+            class="border p-2 mr-4 text-black"
+          />
+
+          <button class="dark:text-white" id="modeToggle">Light | Dark</button>
+
+          <button id="resetDataBtn" class="bg-red-500 text-white px-4 py-2">
+            Reset Data
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="container mx-auto p-4">
+      <!-- Stopwatch Display -->
+      <div
+        id="stopwatch"
+        class="flex flex-col items-center animate__animated animate__fadeIn"
+      >
+        <div class="clock-container">
+          <div class="clock-face shadow-lg">
+            <svg id="clockTicks" width="100%" height="100%">
+              <!-- Tick marks will be added here by JavaScript -->
+            </svg>
+            <div id="hand" class="hand"></div>
+          </div>
+        </div>
+        <div id="timerDisplay" class="font-bold dark:text-white-300">
+          00:00:00
+        </div>
+        <div class="content-center">
+          <button
+            id="startStopBtn"
+            class="bg-blue-500 text-white px-4 py-2 hover:bg-blue-600 shadow-md animate__animated animate__pulse"
+          >
+            Start
+          </button>
+          <button
+            id="resetBtn"
+            class="bg-gray-500 text-white px-4 py-2 animate__animated animate__pulse"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Exercise Input -->
+
+      <div id="exerciseInput" class="mt-8 flex justify-center">
+        <input
+          type="text"
+          id="exerciseName"
+          placeholder="Exercise Name"
+          class="border p-2"
+          list="exerciseNameSuggestions"
+        />
+
+        <datalist id="exerciseNameSuggestions">
+          <!-- Suggestions will be populated here -->
+        </datalist>
+        <!-- Rest of the input elements -->
+        <input
+          type="number"
+          id="weight"
+          placeholder="Weight"
+          class="border p-2"
+        />
+        <select id="weightUnit" class="border p-2">
+          <option value="lbs">lbs</option>
+          <option value="kg">kg</option>
+        </select>
+        <button id="submitBtn" class="bg-green-500 text-white px-4 py-2">
+          Submit
+        </button>
+      </div>
+
+      <!-- Exercise Table -->
+      <table id="exerciseTable" class="table-auto w-full mt-8">
+        <thead>
+          <tr>
+            <th class="px-4 py-2">Exercise Name</th>
+            <th class="px-4 py-2">Weight</th>
+            <th class="px-4 py-2">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Exercise rows will be added here -->
+        </tbody>
+      </table>
+      <div class="mt-8">
+        <canvas id="weightChart"></canvas>
+      </div>
+    </div>
+
+    <script>
+    // DOM Elements
+const startStopBtn = document.getElementById("startStopBtn");
+const resetBtn = document.getElementById("resetBtn");
+const submitBtn = document.getElementById("submitBtn");
+const timerDisplay = document.getElementById("timerDisplay");
+const exerciseNameInput = document.getElementById("exerciseName");
+const weightInput = document.getElementById("weight");
+const weightUnitSelect = document.getElementById("weightUnit");
+const exerciseTableBody = document.getElementById("exerciseTable").getElementsByTagName("tbody")[0];
+const hand = document.getElementById("hand");
+const clockTicks = document.getElementById("clockTicks");
+
+// Variables
+let timerRunning = false;
+let startTime;
+let updatedTime;
+let difference;
+let tInterval;
+let savedTime;
+let paused = 0;
+let runningTime = 0;
+let degrees = 0;
+
+// Event Listeners
+document.addEventListener("DOMContentLoaded", loadPage);
+document.getElementById("modeToggle").addEventListener("click", toggleMode);
+document.getElementById("resetDataBtn").addEventListener("click", resetData);
+document.getElementById("username").addEventListener("input", saveUsername);
+startStopBtn.addEventListener("click", toggleTimer);
+resetBtn.addEventListener("click", resetTimer);
+submitBtn.addEventListener("click", submitExercise);
+
+
+// Functions
+function loadPage() {
+  // Load mode and username from Local Storage
+  const currentMode = localStorage.getItem("mode") || "light-mode"; // Default to light mode
+  document.body.classList.add(currentMode);
+  let storedUsername = localStorage.getItem("username");
+  if (storedUsername) {
+    document.getElementById("username").value = storedUsername;
+  }
+  loadFromLocalStorage(); // Load exercise data
+  createChart();
+}
+
+function toggleMode() {
+  const newMode = document.body.classList.contains("light-mode") ? "dark-mode" : "light-mode";
+  document.body.className = newMode;
+  localStorage.setItem("mode", newMode);
+}
+function resetData() {
+  const userConfirmed = confirm(
+    "Are you sure you want to reset all data? This action cannot be undone."
+  );
+  if (userConfirmed) {
+    localStorage.clear();
+    window.location.reload(); // Reload the page to clear all data
+  }
+}
+
+function saveUsername() {
+  localStorage.setItem("username", this.value);
+}
+function loadFromLocalStorage() {
+  let storedExercises = localStorage.getItem("exercises");
+  if (storedExercises) {
+    let exercises = JSON.parse(storedExercises);
+    exercises.forEach((exercise) => {
+      addExerciseRow(exercise.name, exercise.weight, exercise.weightUnit, exercise.time);
+    });
+  }
+}
+
+function toggleTimer() {
+  if (!timerRunning) {
+    startTimer();
+    this.textContent = "Stop";
+    this.classList.remove("bg-blue-500");
+    this.classList.add("bg-red-500");
+    timerRunning = true;
+  } else {
+    stopTimer();
+    this.textContent = "Start";
+    this.classList.remove("bg-red-500");
+    this.classList.add("bg-blue-500");
+    timerRunning = false;
+  }
+}
+
+function resetTimer() {
+  clearInterval(tInterval);
+  savedTime = 0;
+  difference = 0;
+  paused = 0;
+  runningTime = 0;
+  degrees = 0;
+  timerDisplay.innerHTML = "00:00:00";
+  hand.style.transform = "translateX(-50%) rotate(0deg)";
+  createChart();
+}
+
+function submitExercise() {
+  let exerciseName = exerciseNameInput.value.trim();
+  let weight = weightInput.value.trim();
+  let weightUnit = weightUnitSelect.value;
+  let time = timerDisplay.textContent;
+
+  if (exerciseName && weight && time) {
+    addExerciseRow(exerciseName, weight, weightUnit, time);
+    saveToLocalStorage(); // Save after adding a new exercise
+    postData();
+  } else {
+    console.log("Please fill in all fields before submitting.");
+  }
+}
+
+function startTimer() {
+    startTime = new Date().getTime();
+        tInterval = setInterval(getShowTime, 1);
+        paused = 0;
+        runningTime = 0;
+}
+
+function stopTimer() {
+    clearInterval(tInterval);
+        savedTime = difference;
+        paused = 1;
+        runningTime = difference;
+}
+
+function getShowTime() {
+    updatedTime = new Date().getTime();
+        if (savedTime) {
+          difference = updatedTime - startTime + savedTime;
+        } else {
+          difference = updatedTime - startTime;
+        }
+        let hours = Math.floor(
+          (difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+        );
+        let minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+        let seconds = Math.floor((difference % (1000 * 60)) / 1000);
+        hours = hours < 10 ? "0" + hours : hours;
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+        timerDisplay.innerHTML = hours + ":" + minutes + ":" + seconds;
+
+        // Update clock hand rotation
+        degrees = (seconds / 60) * 360;
+        hand.style.transform = "translateX(-50%) rotate(" + degrees + "deg)";
+}
+
+function addExerciseRow(exerciseName, weight, weightUnit, time) {
+    let row = exerciseTableBody.insertRow();
+        let cell1 = row.insertCell(0);
+        let cell2 = row.insertCell(1);
+        let cell3 = row.insertCell(2);
+        cell1.textContent = exerciseName;
+        cell2.textContent = `${weight} ${weightUnit}`;
+        cell3.textContent = time;
+        updateExerciseNameSuggestions();
+}
+function updateExerciseNameSuggestions() {
+        const exerciseNames = new Set();
+        for (let row of exerciseTableBody.rows) {
+          let exerciseName = row.cells[0].textContent.trim();
+          exerciseNames.add(exerciseName);
+        }
+
+        const dataList = document.getElementById("exerciseNameSuggestions");
+        dataList.innerHTML = ""; // Clear existing suggestions
+
+        exerciseNames.forEach((name) => {
+          const option = document.createElement("option");
+          option.value = name;
+          dataList.appendChild(option);
+        });
+}
+function saveToLocalStorage() {
+    let exercises = [];
+        for (let row of exerciseTableBody.rows) {
+          let exercise = {
+            name: row.cells[0].textContent,
+            weight: row.cells[1].textContent.split(" ")[0],
+            weightUnit: row.cells[1].textContent.split(" ")[1],
+            time: row.cells[2].textContent,
+          };
+          exercises.push(exercise);
+        }
+        localStorage.setItem("exercises", JSON.stringify(exercises));
+        createChart();
+}
+
+function postData() {
+       // Assuming the last row contains the latest data
+       let lastRow = exerciseTableBody.rows[exerciseTableBody.rows.length - 1];
+
+if (lastRow) {
+  let exerciseName = lastRow.cells[0].textContent;
+  let weightWithUnit = lastRow.cells[1].textContent.split(" ");
+  let weight = weightWithUnit[0];
+  let weightUnit = weightWithUnit[1];
+  let time = lastRow.cells[2].textContent;
+  let dateTime = new Date().toISOString();
+
+  axios
+    .post(
+      "https://hook.us1.make.com/xmbkvai7dff78aeazm5l9boio8w8gx3e",
+      {
+        exerciseName: exerciseName,
+        weight: weight,
+        weightUnit: weightUnit,
+        time: time,
+        dateTime: dateTime,
+      }
+    )
+    .then(function (response) {
+      console.log("Success:", response.data);
+    })
+    .catch(function (error) {
+      console.error("Error:", error);
+    });
+} else {
+  console.log("No data available to send.");
+}
+exerciseNameInput.value = "";
+weightInput.value = "";
+resetTimer();
+}
+
+function stringToColor(str) {
+    let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        let color = "#";
+        for (let i = 0; i < 3; i++) {
+          let value = (hash >> (i * 8)) & 0xff;
+          color += ("00" + value.toString(16)).substr(-2);
+        }
+        return color;
+}
+
+function createChart() {
+    let exerciseData = {};
+        let rowCounter = 0;
+
+        for (let row of exerciseTableBody.rows) {
+          let exerciseName = row.cells[0].textContent;
+          let weight = parseFloat(row.cells[1].textContent.split(" ")[0]);
+
+          if (!exerciseData[exerciseName]) {
+            exerciseData[exerciseName] = [];
+          }
+          exerciseData[exerciseName].push({ x: rowCounter, y: weight });
+          rowCounter++;
+        }
+
+        let datasets = Object.keys(exerciseData).map((exercise) => ({
+          label: exercise,
+          data: exerciseData[exercise],
+          fill: false,
+          borderColor: stringToColor(exercise),
+          tension: 0.1,
+        }));
+
+        new Chart(document.getElementById("weightChart"), {
+          type: "line",
+          data: { datasets: datasets },
+          options: {
+            scales: {
+              x: {
+                display: true,
+                title: {
+                  display: true,
+                  text: "Session #",
+                },
+                text: "dsadasd",
+                type: "linear",
+                position: "bottom",
+                beginAtZero: true,
+              },
+              y: {
+                beginAtZero: true,
+                display: true,
+                title: {
+                  display: true,
+                  text: "Weight",
+                },
+              },
+            },
+          },
+        });
+      
+}
+
+
+
+  
+
+
+
+  
+
+
+
+    </script>
+  </body>
+</html>
